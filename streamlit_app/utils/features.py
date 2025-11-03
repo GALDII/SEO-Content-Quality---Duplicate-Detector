@@ -1,116 +1,85 @@
 """
-Feature Extraction utilities for SEO content analysis
+Feature extraction utilities for SEO content analysis.
 """
+
+import numpy as np
 import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 import textstat
 from sklearn.feature_extraction.text import TfidfVectorizer
-import numpy as np
-import warnings
-warnings.filterwarnings('ignore')
 
-# Global flag to track if sentence transformers is available
-_SENTENCE_TRANSFORMERS_AVAILABLE = False
-_embedding_model = None
+# Download required NLTK data
+try:
+    nltk.download('punkt', quiet=True)
+    nltk.download('stopwords', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
+except:
+    pass
 
-def _try_load_sentence_transformer():
-    """Try to load SentenceTransformer, return None if fails"""
-    global _SENTENCE_TRANSFORMERS_AVAILABLE, _embedding_model
-    try:
-        from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        _SENTENCE_TRANSFORMERS_AVAILABLE = True
-        return _embedding_model
-    except Exception as e:
-        print(f"⚠️ Warning: Could not load SentenceTransformer: {e}")
-        print("📝 Falling back to TF-IDF for similarity detection")
-        _SENTENCE_TRANSFORMERS_AVAILABLE = False
-        return None
-
-def get_embedding_model():
-    """Lazy load the embedding model."""
-    global _embedding_model
-    if _embedding_model is None:
-        _embedding_model = _try_load_sentence_transformer()
-    return _embedding_model
 
 def clean_text(text):
-    """
-    Clean and normalize text.
-    
-    Args:
-        text: Raw text string
-        
-    Returns:
-        str: Cleaned text
-    """
+    """Clean and normalize text."""
     if not isinstance(text, str):
         return ""
-    # Lowercase and remove extra whitespace
     text = text.lower()
     text = " ".join(text.split())
     return text
 
+
 def calculate_sentence_count(text):
-    """
-    Calculate number of sentences in text.
-    
-    Args:
-        text: Text string
-        
-    Returns:
-        int: Number of sentences
-    """
+    """Calculate number of sentences in text."""
     try:
+        from nltk.tokenize import sent_tokenize
         sentences = sent_tokenize(text)
         return len(sentences)
     except:
-        return 0
+        # Fallback: count periods, exclamation marks, question marks
+        return text.count('.') + text.count('!') + text.count('?')
+
 
 def calculate_readability(text):
-    """
-    Calculate Flesch Reading Ease score.
-    
-    Args:
-        text: Text string
-        
-    Returns:
-        float: Flesch Reading Ease score (0-100)
-    """
+    """Calculate Flesch Reading Ease score."""
     try:
         score = textstat.flesch_reading_ease(text)
         return round(score, 2)
     except:
-        return 0.0
+        return 50.0  # Default middle value
 
-def extract_keywords(text, top_n=5):
-    """
-    Extract top keywords using TF-IDF.
-    
-    Args:
-        text: Text string
-        top_n: Number of top keywords to extract
-        
-    Returns:
-        str: Pipe-separated keywords
-    """
+
+def calculate_avg_word_length(text):
+    """Calculate average word length."""
     try:
-        # Remove stop words
+        words = word_tokenize(text)
+        words = [w for w in words if w.isalpha()]
+        if len(words) == 0:
+            return 0
+        avg_length = sum(len(word) for word in words) / len(words)
+        return round(avg_length, 2)
+    except:
+        # Fallback calculation
+        words = text.split()
+        words = [w for w in words if w.isalpha()]
+        if len(words) == 0:
+            return 0
+        return round(sum(len(word) for word in words) / len(words), 2)
+
+
+def extract_top_keywords(text, top_n=5):
+    """Extract top keywords using TF-IDF."""
+    try:
         stop_words = list(stopwords.words('english'))
         
         vectorizer = TfidfVectorizer(
-            max_features=100,
+            max_features=50,
             stop_words=stop_words,
             ngram_range=(1, 2),
             min_df=1
         )
         
-        # TF-IDF needs a list of documents
         tfidf_matrix = vectorizer.fit_transform([text])
         feature_names = vectorizer.get_feature_names_out()
         
-        # Get top keywords for this document
         doc_vector = tfidf_matrix.toarray().flatten()
         top_indices = doc_vector.argsort()[-top_n:][::-1]
         top_keywords = [feature_names[i] for i in top_indices if doc_vector[i] > 0]
@@ -120,66 +89,125 @@ def extract_keywords(text, top_n=5):
         print(f"Error extracting keywords: {e}")
         return ""
 
-def generate_embedding(text):
-    """
-    Generate sentence embedding using SentenceTransformers.
-    Falls back to TF-IDF vector if SentenceTransformers unavailable.
-    
-    Args:
-        text: Text string
-        
-    Returns:
-        numpy array: Embedding vector
-    """
-    global _SENTENCE_TRANSFORMERS_AVAILABLE
-    
-    # Try sentence transformers first
-    if _SENTENCE_TRANSFORMERS_AVAILABLE or _embedding_model is None:
-        model = get_embedding_model()
-        if model is not None:
-            try:
-                embedding = model.encode([text])[0]
-                return embedding
-            except Exception as e:
-                print(f"Error with SentenceTransformer: {e}")
-                _SENTENCE_TRANSFORMERS_AVAILABLE = False
-    
-    # Fallback: Use TF-IDF vector
-    try:
-        vectorizer = TfidfVectorizer(max_features=384, stop_words='english')
-        tfidf_vec = vectorizer.fit_transform([text]).toarray()[0]
-        # Pad to 384 dimensions if needed
-        if len(tfidf_vec) < 384:
-            tfidf_vec = np.pad(tfidf_vec, (0, 384 - len(tfidf_vec)), 'constant')
-        return tfidf_vec[:384]
-    except:
-        return np.zeros(384)
 
-def extract_features(text):
+def generate_embedding_tfidf(text, max_features=100):
+    """
+    Generate TF-IDF based embedding as fallback.
+    Returns a dense vector representation.
+    """
+    try:
+        stop_words = list(stopwords.words('english'))
+        
+        vectorizer = TfidfVectorizer(
+            max_features=max_features,
+            stop_words=stop_words,
+            ngram_range=(1, 2)
+        )
+        
+        # Fit and transform
+        tfidf_matrix = vectorizer.fit_transform([text])
+        embedding = tfidf_matrix.toarray()[0]
+        
+        # Pad to consistent size if needed
+        if len(embedding) < max_features:
+            embedding = np.pad(embedding, (0, max_features - len(embedding)))
+        
+        return embedding
+    except Exception as e:
+        print(f"Error generating TF-IDF embedding: {e}")
+        return np.zeros(max_features)
+
+# This is the function you added
+def calculate_unique_word_ratio(text):
+    """Calculate the ratio of unique words to total words."""
+    try:
+        words = word_tokenize(text)
+        words = [w for w in words if w.isalpha()] # Filter punctuation
+        if len(words) == 0:
+            return 0
+        unique_words = set(words)
+        return round(len(unique_words) / len(words), 4)
+    except Exception:
+        # Fallback for any errors
+        words_list = text.split()
+        if not words_list:
+            return 0
+        return round(len(set(words_list)) / len(words_list), 4)
+
+
+def generate_embedding_transformer(text, model=None):
+    """
+    Generate embedding using SentenceTransformer.
+    Falls back to TF-IDF if model is not available.
+    """
+    if model is not None:
+        try:
+            embedding = model.encode([text])[0]
+            return embedding
+        except Exception as e:
+            print(f"Error with SentenceTransformer: {e}")
+            return generate_embedding_tfidf(text)
+    else:
+        return generate_embedding_tfidf(text)
+
+
+def extract_features(text, embedding_model=None):
     """
     Extract all features from text.
     
     Args:
-        text: Raw text string
+        text: Input text to analyze
+        embedding_model: Optional SentenceTransformer model
         
     Returns:
-        dict: Dictionary containing all features
+        dict: Dictionary of extracted features
     """
-    # Clean text
-    clean_text_val = clean_text(text)
-    
-    # Calculate features
-    word_count = len(text.split())
-    sentence_count = calculate_sentence_count(text)
-    readability = calculate_readability(text)
-    keywords = extract_keywords(clean_text_val)
-    embedding = generate_embedding(clean_text_val)
-    
-    return {
-        'word_count': word_count,
-        'sentence_count': sentence_count,
-        'flesch_reading_ease': readability,
-        'top_keywords': keywords,
-        'embedding': embedding,
-        'clean_text': clean_text_val
-    }
+    try:
+        # Clean text
+        clean_text_val = clean_text(text)
+        
+        # Calculate basic features
+        word_count = len(text.split())
+        sentence_count = calculate_sentence_count(text)
+        flesch_score = calculate_readability(text)
+        avg_word_length = calculate_avg_word_length(text)
+        
+        # *** FIX 1: Call your new function ***
+        unique_ratio = calculate_unique_word_ratio(clean_text_val)
+        
+        # Extract keywords
+        keywords = extract_top_keywords(clean_text_val)
+        
+        # Generate embedding
+        embedding = generate_embedding_transformer(clean_text_val, embedding_model)
+        
+        return {
+            'word_count': word_count,
+            'sentence_count': max(1, sentence_count),  # Ensure at least 1
+            'flesch_reading_ease': flesch_score,
+            'avg_word_length': avg_word_length,
+            
+            # *** FIX 2: Add the key to the dictionary ***
+            'unique_word_ratio': unique_ratio,
+            
+            'top_keywords': keywords,
+            'embedding': embedding,
+            'clean_text': clean_text_val
+        }
+        
+    except Exception as e:
+        print(f"Error extracting features: {e}")
+        # Return default values
+        return {
+            'word_count': 0,
+            'sentence_count': 1,
+            'flesch_reading_ease': 50.0,
+            'avg_word_length': 5.0,
+            
+            # *** FIX 3: Add the key to the default dictionary too ***
+            'unique_word_ratio': 0.4, # Default value
+            
+            'top_keywords': "",
+            'embedding': np.zeros(100),
+            'clean_text': ""
+        }
