@@ -1,7 +1,3 @@
-"""
-SEO Content Quality & Duplicate Detector - Enhanced Streamlit App
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np

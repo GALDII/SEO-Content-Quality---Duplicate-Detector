@@ -34,7 +34,6 @@ def calculate_sentence_count(text):
         sentences = sent_tokenize(text)
         return len(sentences)
     except:
-        # Fallback: count periods, exclamation marks, question marks
         return text.count('.') + text.count('!') + text.count('?')
 
 
@@ -44,7 +43,7 @@ def calculate_readability(text):
         score = textstat.flesch_reading_ease(text)
         return round(score, 2)
     except:
-        return 50.0  # Default middle value
+        return 50.0
 
 
 def calculate_avg_word_length(text):
@@ -57,7 +56,6 @@ def calculate_avg_word_length(text):
         avg_length = sum(len(word) for word in words) / len(words)
         return round(avg_length, 2)
     except:
-        # Fallback calculation
         words = text.split()
         words = [w for w in words if w.isalpha()]
         if len(words) == 0:
@@ -122,7 +120,7 @@ def calculate_unique_word_ratio(text):
     """Calculate the ratio of unique words to total words."""
     try:
         words = word_tokenize(text)
-        words = [w for w in words if w.isalpha()] # Filter punctuation
+        words = [w for w in words if w.isalpha()]
         if len(words) == 0:
             return 0
         unique_words = set(words)
@@ -183,7 +181,7 @@ def extract_features(text, embedding_model=None):
         
         return {
             'word_count': word_count,
-            'sentence_count': max(1, sentence_count),  # Ensure at least 1
+            'sentence_count': max(1, sentence_count),
             'flesch_reading_ease': flesch_score,
             'avg_word_length': avg_word_length,
             
@@ -197,15 +195,13 @@ def extract_features(text, embedding_model=None):
         
     except Exception as e:
         print(f"Error extracting features: {e}")
-        # Return default values
         return {
             'word_count': 0,
             'sentence_count': 1,
             'flesch_reading_ease': 50.0,
             'avg_word_length': 5.0,
             
-            # *** FIX 3: Add the key to the default dictionary too ***
-            'unique_word_ratio': 0.4, # Default value
+            'unique_word_ratio': 0.4,
             
             'top_keywords': "",
             'embedding': np.zeros(100),

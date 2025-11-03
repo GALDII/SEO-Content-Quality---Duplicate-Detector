@@ -14,10 +14,10 @@ def get_model_path():
     """Get the correct path to the model file."""
     # Try multiple possible locations
     possible_paths = [
-        Path(__file__).parent.parent / 'models' / 'quality_model.pkl',  # From utils folder
-        Path('models') / 'quality_model.pkl',  # From project root
-        Path('../models/quality_model.pkl'),  # Relative path
-        Path('streamlit_app/models/quality_model.pkl'),  # Alternative structure
+        Path(__file__).parent.parent / 'models' / 'quality_model.pkl',
+        Path('models') / 'quality_model.pkl',
+        Path('../models/quality_model.pkl'), 
+        Path('streamlit_app/models/quality_model.pkl'),
     ]
     
     for path in possible_paths:
@@ -67,7 +67,6 @@ def predict_quality(model_data, features):
         Dict with quality_label and confidence scores
     """
     if model_data is None:
-        # Fallback prediction based on simple rules
         return fallback_quality_prediction(features)
     
     try:
@@ -274,7 +273,7 @@ def calculate_content_score(features):
     """
     score = 0
     
-    # Word count (max 30 points)
+    # Word count
     word_count = features['word_count']
     if word_count >= 1000:
         score += 30
@@ -283,7 +282,7 @@ def calculate_content_score(features):
     elif word_count >= 300:
         score += 10
     
-    # Readability (max 30 points)
+    # Readability
     readability = features['flesch_reading_ease']
     if 40 <= readability <= 60:
         score += 30
@@ -292,7 +291,7 @@ def calculate_content_score(features):
     elif 20 <= readability <= 80:
         score += 10
     
-    # Vocabulary diversity (max 20 points)
+    # Vocabulary diversity
     unique_ratio = features['unique_word_ratio']
     if unique_ratio >= 0.5:
         score += 20
@@ -301,7 +300,7 @@ def calculate_content_score(features):
     elif unique_ratio >= 0.3:
         score += 10
     
-    # Sentence structure (max 20 points)
+    # Sentence structure
     avg_sentence_length = word_count / features['sentence_count'] if features['sentence_count'] > 0 else 0
     if 15 <= avg_sentence_length <= 20:
         score += 20
