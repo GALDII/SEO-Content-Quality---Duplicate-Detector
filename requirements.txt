@@ -1,32 +1,13 @@
-Streamlit App Requirements
-
-Core
-
 streamlit==1.28.0
 pandas==2.0.3
 numpy==1.24.3
-
-Machine Learning
-
 scikit-learn==1.3.0
 joblib==1.3.2
-
-HTML Parsing & Web Scraping
-
 beautifulsoup4==4.12.2
 lxml==4.9.3
 requests==2.31.0
-
-NLP - Core (Required)
-
 nltk==3.8.1
 textstat==0.7.3
-
-NLP - Full (We WANT these on Streamlit Cloud)
-
 sentence-transformers==2.2.2
 torch==2.0.1
-
-Visualization
-
 plotly==5.17.0
